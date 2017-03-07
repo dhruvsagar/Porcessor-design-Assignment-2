@@ -67,6 +67,23 @@ module Project(
   parameter OP2_RSHF = 8'b00110000;
   parameter OP2_LSHF = 8'b00110001;
   
+  /* ALUFUNC */
+  parameter ALUFUNC_EQ   = 6'b000000;
+  parameter ALUFUNC_LT   = 6'b000001;
+  parameter ALUFUNC_LE   = 6'b000010;
+  parameter ALUFUNC_NE   = 6'b000011;
+  parameter ALUFUNC_ADD  = 6'b000100;
+  parameter ALUFUNC_AND  = 6'b000101;
+  parameter ALUFUNC_OR   = 6'b000110;
+  parameter ALUFUNC_XOR  = 6'b000111;
+  parameter ALUFUNC_SUB  = 6'b001000;
+  parameter ALUFUNC_NAND = 6'b001001;
+  parameter ALUFUNC_NOR  = 6'b001010;
+  parameter ALUFUNC_NXOR = 6'b001011;
+  parameter ALUFUNC_RSHF = 6'b001100;
+  parameter ALUFUNC_LSHF = 6'b001101;
+  
+  
   parameter HEXBITS  = 24;
   parameter LEDRBITS = 10;
   
@@ -196,64 +213,49 @@ module Project(
   //ALU results
 	always @ (*)
 	begin: ALU_OPERATION
-		case(op1)
-			OP1_EXT: begin
-			  case(op2)
-				  OP2_EQ: begin
-					  ALUout = A == B;
-				  end
-				  OP2_LT: begin
-					  ALUout = A < B;
-				  end
-				  OP2_LE: begin
-					  ALUout = A <= B;
-				  end
-				  OP2_NE: begin
-					  ALUout = A != B;
-				  end
-				  OP2_ADD: begin
-					  ALUout = A + B;
-				  end
-				  OP2_AND: begin
-					  ALUout = A & B;
-				  end
-				  OP2_OR: begin
-					  ALUout = A | B;
-				  end
-				  OP2_XOR: begin
-					  ALUout = A ^ B;
-				  end
-				  OP2_SUB: begin
-					  ALUout = A - B;
-				  end
-				  OP2_NAND: begin
-					  ALUout = ~(A & B);
-				  end
-				  OP2_NOR: begin
-					  ALUout = ~(A | B);
-				  end
-				  OP2_NXOR: begin
-					  ALUout = ~(A ^ B);
-				  end
-				  OP2_RSHF: begin
-					  ALUout = A >> B;
-				  end
-				  OP2_LSHF: begin
-					  ALUout = A << B;
-				  end
-			end
-			OP1_ADD: begin
-				ALUout = A + B;
-			end
-			OP1_AND: begin
-				ALUout = A & B;
-			end
-			OP1_ORI: begin
-				ALUout = A | B;
-			end
-			OP1_XOR: begin
-				ALUout = A ^ B;
-			end
+		case(ALUfunc)
+		  ALUFUNC_EQ: begin
+			  ALUout = A == B;
+		  end
+		  ALUFUNC_LT: begin
+			  ALUout = A < B;
+		  end
+		  ALUFUNC_LE: begin
+			  ALUout = A <= B;
+		  end
+		  ALUFUNC_NE: begin
+			  ALUout = A != B;
+		  end
+		  ALUFUNC_ADD: begin
+			  ALUout = A + B;
+		  end
+		  ALUFUNC_AND: begin
+			  ALUout = A & B;
+		  end
+		  ALUFUNC_OR: begin
+			  ALUout = A | B;
+		  end
+		  ALUFUNC_XOR: begin
+			  ALUout = A ^ B;
+		  end
+		  ALUFUNC_SUB: begin
+			  ALUout = A - B;
+		  end
+		  ALUFUNC_NAND: begin
+			  ALUout = ~(A & B);
+		  end
+		  ALUFUNC_NOR: begin
+			  ALUout = ~(A | B);
+		  end
+		  ALUFUNC_NXOR: begin
+			  ALUout = ~(A ^ B);
+		  end
+		  ALUFUNC_RSHF: begin
+			  ALUout = A >> B;
+		  end
+		  ALUFUNC_LSHF: begin
+			  ALUout = A << B;
+		  end
 			default:
 				ALUout = 0;
 		endcase
