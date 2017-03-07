@@ -198,7 +198,61 @@ module Project(
 	begin: ALU_OPERATION
 		case(op1)
 			OP1_EXT: begin
-			  ALUout = 0;
+			  case(op2)
+				  OP2_EQ: begin
+					  ALUout = A == B;
+				  end
+				  OP2_LT: begin
+					  ALUout = A < B;
+				  end
+				  OP2_LE: begin
+					  ALUout = A <= B;
+				  end
+				  OP2_NE: begin
+					  ALUout = A != B;
+				  end
+				  OP2_ADD: begin
+					  ALUout = A + B;
+				  end
+				  OP2_AND: begin
+					  ALUout = A & B;
+				  end
+				  OP2_OR: begin
+					  ALUout = A | B;
+				  end
+				  OP2_XOR: begin
+					  ALUout = A ^ B;
+				  end
+				  OP2_SUB: begin
+					  ALUout = A - B;
+				  end
+				  OP2_NAND: begin
+					  ALUout = ~(A & B);
+				  end
+				  OP2_NOR: begin
+					  ALUout = ~(A | B);
+				  end
+				  OP2_NXOR: begin
+					  ALUout = ~(A ^ B);
+				  end
+				  OP2_RSHF: begin
+					  ALUout = A >> B;
+				  end
+				  OP2_LSHF: begin
+					  ALUout = A << B;
+				  end
+			end
+			OP1_ADD: begin
+				ALUout = A + B;
+			end
+			OP1_AND: begin
+				ALUout = A & B;
+			end
+			OP1_ORI: begin
+				ALUout = A | B;
+			end
+			OP1_XOR: begin
+				ALUout = A ^ B;
 			end
 			default:
 				ALUout = 0;
@@ -212,6 +266,7 @@ module Project(
   // TODO: Put the code for data memory and I/O here  
   //Data memory
   reg [(DBITS-1):0] MAR;
+  reg [(DBITS-1):0] dmem[(DMEMWORDS-1):0];
   
   //Data signals
   wire [(DBITS-1):0] memin, MemVal;
