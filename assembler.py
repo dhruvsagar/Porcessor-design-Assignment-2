@@ -44,7 +44,7 @@ ps_codes = {
 	'SUBI':	'ADDI'
 }
 
-asm_registers = {
+asm_regs = {
 	'R0':	0,
 	'R1':	1,
 	'R2':	2,
@@ -80,7 +80,8 @@ asm_registers = {
 # Function definitions.
 
 def parse_line(line, l_type):
-	line, comment = line.split(';', 1) # get rid of in-line comment text
+	l_list = line.split(';', 1) # get rid of in-line comment text
+	line = l_list if type(l_list) == type(str()) else l_list[0]
 	line = line.strip()
 
 	ret_list = []
@@ -93,16 +94,19 @@ def parse_line(line, l_type):
 		label, val = assign.split('=')
 		ret_list = [label, val]
 	elif l_type == 'OP':
-		op, rs, rt, imm = line.split(',') # note the position of imm
+		op, args = line.split(maxsplit=1)
+		rs, rt, imm = args.split(',') # note the position of imm
 		ret_list = [op, imm, rs, rt] # note the switched position of imm
 	elif l_type == 'OP2':
-		op2, rd, rs, rt = line.split(',')
+		op2, args = line.split(maxsplit=1)
+		rd, rs, rt = args.split(',')
 		ret_list = [op2, rd, rs, rt]
 	elif l_type == 'MEM':
-		opm, rt, imm_rs = line.split(',')
+		opm, args = line.split(maxsplit=1)
+		rt, imm_rs = args.split(',')
 		imm, rs = imm_rs.split('(')
 		rs = rs[:-1] # strip trailing ')'
-		ret_list = [op, imm, rt, rs] # imm could also be a label
+		ret_list = [opm, imm, rt, rs] # imm could also be a label
 	else: # line is a label
 		label = line[:-1] # strip trailing ':'
 		ret_list = [label]
@@ -114,57 +118,65 @@ def parse_line(line, l_type):
 	return ret_list
 
 def parse_pseudo(line):
-	first_word, rest_of_line = line.split(maxsplit=1)
+	l_list = line.split(maxsplit=1)
+	first_word = l_list if type(l_list) == type(str()) else l_list[0]
 	first_word = first_word.upper()
 
-	line, comment = line.split(';', 1) # get rid of in-line comment text
+	l_list = line.split(';', 1) # get rid of in-line comment text
+	line = l_list if type(l_list) == type(str()) else l_list[0]
 	line = line.strip()
 
 	args, i_type = [], '' 
 
 	if first_word == 'NOT':
 		i_type = 'OP2'
-		op, ri, rj = line.split(',')
+		op, o_args = line.split(maxsplit=1)
+		ri, rj = o_args.split(',')
 		args = ['NAND', ri, rj, rj]
 	elif first_word == 'RET':
 		i_type = 'MEM'
 		args = ['JAL', '0', 'RA', 'R10']
 	elif first_word == 'BGT':
 		i_type = 'OP'
-		op, ry, rx, label = line.split(',')
+		op, o_args = line.split(maxsplit=1)
+		ry, rx, label = o_args.split(',')
 		args = ['BLT', label, rx, ry]
 	elif first_word == 'BR':
 		i_type = 'OP'
-		op, label = line.split(',')
+		op, label = line.split()
 		args = ['BEQ', label, 'Zero', 'Zero']
 	elif first_word == 'GE':
 		i_type = 'OP2'
-		op, rz, ry, rx = line.split(',')
+		op, o_args = line.split(maxsplit=1)
+		rz, ry, rx = o_args.split(',')
 		args = ['LE', rz, rx, ry]
 	elif first_word == 'CALL':
 		i_type = 'MEM'
-		op, imm_ri = line.split(',')
+		op, imm_ri = line.split()
 		imm, ri = imm_ri.split('(')
 		ri = ri[:-1] # strip trailing ')'
-		args = ['JAL', imm, ri, 'R5'] # imm could also be a label
+		args = ['JAL', imm, ri, 'RA'] # imm could also be a label
 	elif first_word == 'JMP':
 		i_type = 'MEM'
-		op, imm_ri = line.split(',')
+		op, imm_ri = line.split()
 		imm, ri = imm_ri.split('(')
 		ri = ri[:-1] # strip trailing ')'
 		args = ['JAL', imm, ri, 'R10'] # imm could also be a label
 	elif first_word == 'BGE':
 		i_type = 'OP'
-		op, ry, rx, label = line.split(',')
+		op, o_args = line.split()
+		ry, rx, label = o_args.split(',')
 		args = ['BLE', label, rx, ry]
 	elif first_word == 'GT':
 		i_type = 'OP2'
-		op, rz, ry, rx = line.split(',')
+		op, o_args = line.split()
+		rz, ry, rx = o_args.split(',')
 		args = ['LT', rz, rx, ry]
 	else: # instruction is SUBI
 		i_type = 'OP'
-		op, ry, rx, imm = line.split(',')
-		args = ['ADDI', str(-int(imm)), ry, rx] # str to match other args
+		op, o_args = line.split()
+		ry, rx, imm = o_args.split(',')
+		args = ['ADDI', str(-num(imm)), ry, rx] # return str to match others
 
 	for i in range(len(args)):
 		args[i] = args[i].strip()
@@ -177,22 +189,28 @@ def trans_instr(args, i_type, labels):
 
 	if i_type == 'OP':
 		op, imm, rs, rt = args[0], args[1], args[2], args[3]
-		op, imm, rs, rt = op_codes[op], int(imm), int(rs), int(rt)
+		imm = labels[imm] if imm in labels else num(imm)
+		op, rs, rt = op_codes[op], asm_regs[rs], asm_regs[rt]
 		instr = (op<<26) + (imm<<8) + (rs<<4) + rt
 	elif i_type == 'OP2':
 		op2, rd, rs, rt = args[0], args[1], args[2], args[3]
-		op2, rd, rs, rt = ex_codes[op2], int(imm), int(rs), int(rt)
+		op2, rd, rs, rt = ex_codes[op2], asm_regs[rd], asm_regs[rs], asm_regs[rt]
 		instr = (op2<<18) + (rd<<8) + (rs<<4) + (rt)
 	else: # instuction is memory instruction
 		opm, imm, rs, rt = args[0], args[1], args[2], args[3]
-		imm = labels[imm] if imm in labels else int(imm)
-		opm, rs, rt = op_codes[opm], int(rs), int(rt)
+		imm = labels[imm] if imm in labels else num(imm)
+		opm, rs, rt = op_codes[opm], asm_regs[rs], asm_regs[rt]
 		instr = (opm<<26) + (imm<<8) + (rs<<4) + rt
 
 	return instr
 
 def line_type(line):
-	first_word, rest_of_line = line.split(maxsplit=1)
+	wsem = re.compile('^\s*$') # 'white space empty matcher'
+	if (wsem.match(line)):
+		return 'COMMENT'
+
+	l_list = line.split(maxsplit=1)
+	first_word = l_list if type(l_list) == type(str()) else l_list[0]
 	first_word = first_word.upper()
 
 	if first_word == '.ORIG':
@@ -208,11 +226,17 @@ def line_type(line):
 		return 'OP2'
 	elif first_word in ps_codes:
 		return 'PSEUDO'
-	elif first_word[0] == ';'
+	elif first_word[0] in [';', '']:
 		return 'COMMENT'
 	else:
 		return 'LBL'
 
+def num(number_str):
+	hm = re.compile('0(x|X)([0-9]|[a-f]|[A-F])*') # 'hex matcher'
+	if hm.match(number_str):
+		return int(number_str, 16)
+	else: 
+		return int(number_str)
 #
 # MAIN FLOW OF EXECUTION-------------------------------------------------------
 #
@@ -224,8 +248,10 @@ if len(sys.argv) != 2:
 
 # read from the input file.
 asm = ''
-with open(sys.argv(1), 'r') as f:
+with open(sys.argv[1], 'r') as f:
 	asm = f.read()
+
+asm = asm.split('\n')
 
 # variables
 orig_addr = 0
@@ -241,12 +267,12 @@ for line in asm:
 
 	if l_type == 'ORIG':
 		val = parse_line(line, l_type)[0] # returned list has one value
-		orig_addr = int(val)
+		orig_addr = num(val)
 		orig_offset = 0
 		continue # don't want to increment orig_offset
 	elif l_type == 'NAME':
 		label, val = parse_line(line, l_type)
-		labels[label] = int(val)
+		labels[label] = num(val)
 		continue
 	elif l_type in ['OP', 'OP2', 'MEM', 'PSEUDO']:
 		pass
@@ -257,10 +283,10 @@ for line in asm:
 		labels[label] = orig_addr + orig_offset
 		continue
 	
-	orig_offset++
+	orig_offset = orig_offset + 1
 
-# open output file for writing
-mif_f = open('output.mif', 'w+')
+# the text to be written to the output file
+mif_txt = ''
 
 # reset variables for second pass
 orig_addr = 0
@@ -275,10 +301,10 @@ for line in asm:
 
 	if l_type == 'ORIG':
 		val = parse_line(line, l_type)[0] # returned list has one value
-		addr_diff = val - orig_addr
-		mif_f.write('[' + curr_addr + '..' + str(hex(int(val)-1))
+		addr_diff = num(val) - orig_addr
+		mif_txt = (mif_txt + '[' + curr_addr + '..' + str(hex(num(val)-1))
 			+ '] : DEAD;\n')
-		orig_addr = int(val)
+		orig_addr = num(val)
 		orig_offset = 0
 		continue # don't want to increment orig_offset
 	elif l_type == 'NAME':
@@ -286,48 +312,50 @@ for line in asm:
 	elif l_type == 'OP':
 		op, imm, rs, rt = parse_line(line, l_type)
 		val =  trans_instr([op, imm, rs, rt], l_type, labels)
-		mif_f.write('-- @ ' + curr_addr + ' :\t\t\t' + op + '\t\t'
-			+ rs + ',' + rt + ',' + imm '\n')
-		mif_f.write(curr_addr + ' : ' + str(hex(val)) + ';\n')
+		mif_txt = (mif_txt + '-- @ ' + curr_addr + ' :\t\t\t' + op + '\t\t'
+			+ rs + ',' + rt + ',' + imm + '\n')
+		mif_txt = (mif_txt + curr_addr + ' : ' + str(hex(val)) + ';\n')
 	elif l_type == 'OP2':
 		op2, rd, rs, rt = parse_line(line, l_type)
 		val =  trans_instr([op2, rd, rs, rt], l_type, labels)
-		mif_f.write('-- @ ' + curr_addr + ' :\t\t\t' + op2 + '\t\t'
-			+ rd + ',' + rs + ',' + rt '\n')
-		mif_f.write(curr_addr + ' : ' + str(hex(val)) + ';\n')
+		mif_txt = (mif_txt + '-- @ ' + curr_addr + ' :\t\t\t' + op2 + '\t\t'
+			+ rd + ',' + rs + ',' + rt + '\n')
+		mif_txt = (mif_txt + curr_addr + ' : ' + str(hex(val)) + ';\n')
 	elif l_type == 'MEM':
 		opm, imm, rs, rt = parse_line(line, l_type)
 		val =  trans_instr([opm, imm, rs, rt], l_type, labels)
-		mif_f.write('-- @ ' + curr_addr + ' :\t\t\t' + opm + '\t\t'
-			+ rs + ',' + rt + ',' + imm '\n')
-		mif_f.write(curr_addr + ' : ' + str(hex(val)) + ';\n')
+		mif_txt = (mif_txt + '-- @ ' + curr_addr + ' :\t\t\t' + opm + '\t\t'
+			+ rs + ',' + rt + ',' + imm + '\n')
+		mif_txt = (mif_txt + curr_addr + ' : ' + str(hex(val)) + ';\n')
 	elif l_type == 'PSEUDO':
 		args, s_type  = parse_pseudo(line)
 
 		if s_type == 'OP':
 			op, imm, rs, rt = args
-			val =  trans_instr([op, imm, rs, rt], l_type, labels)
-			mif_f.write('-- @ ' + curr_addr + ' :\t\t\t' + op + '\t\t'
-				+ rs + ',' + rt + ',' + imm '\n')
-			mif_f.write(curr_addr + ' : ' + str(hex(val)) + ';\n')
+			val =  trans_instr([op, imm, rs, rt], s_type, labels)
+			mif_txt = (mif_txt + '-- @ ' + curr_addr + ' :\t\t\t' + op + '\t\t'
+				+ rs + ',' + rt + ',' + imm + '\n')
+			mif_txt = (mif_txt + curr_addr + ' : ' + str(hex(val)) + ';\n')
 		elif s_type == 'OP2':
 			op2, rd, rs, rt = args
-			val =  trans_instr([op2, rd, rs, rt], l_type, labels)
-			mif_f.write('-- @ ' + curr_addr + ' :\t\t\t' + op2 + '\t\t'
-				+ rd + ',' + rs + ',' + rt '\n')
-			mif_f.write(curr_addr + ' : ' + str(hex(val)) + ';\n')
+			val =  trans_instr([op2, rd, rs, rt], s_type, labels)
+			mif_txt = (mif_txt + '-- @ ' + curr_addr + ' :\t\t\t' + op2 + '\t\t'
+				+ rd + ',' + rs + ',' + rt + '\n')
+			mif_txt = (mif_txt + curr_addr + ' : ' + str(hex(val)) + ';\n')
 		elif s_type == 'MEM':
 			opm, imm, rs, rt = args
-			val =  trans_instr([opm, imm, rs, rt], l_type, labels)
-			mif_f.write('-- @ ' + curr_addr + ' :\t\t\t' + opm + '\t\t'
-				+ rs + ',' + rt + ',' + imm '\n')
-			mif_f.write(curr_addr + ' : ' + str(hex(val)) + ';\n')
+			val =  trans_instr([opm, imm, rs, rt], s_type, labels)
+			mif_txt = (mif_txt + '-- @ ' + curr_addr + ' :\t\t\t' + opm + '\t\t'
+				+ rs + ',' + rt + ',' + imm + '\n')
+			mif_txt = (mif_txt + curr_addr + ' : ' + str(hex(val)) + ';\n')
 	elif l_type == 'COMMENT':
 		continue
 	else: # line is a label
 		continue
 
-	orig_offset++
+	orig_offset = orig_offset + 1
 
-# close output file
+# writing to the output file
+mif_f = open('output.mif', 'w+')
+mif_f.write(mif_txt)
 mif_f.close()
