@@ -17,13 +17,13 @@ module Project(
   parameter INSTBITS =32;
   parameter REGNOBITS=4;
   parameter IMMBITS  =16;
-  parameter STARTPC  =32'h0;//100 #modelsim;
+  parameter STARTPC  =32'h100;// #modelsim;
   parameter ADDRHEX  =32'hFFFFF000;
   parameter ADDRLEDR =32'hFFFFF020;
   parameter ADDRKEY  =32'hFFFFF080;
   parameter ADDRSW   =32'hFFFFF090;
   // Change this to fmedian.mif before submitting
-  parameter IMEMINITFILE="test.mif";
+  parameter IMEMINITFILE="fmedian.mif";
   parameter IMEMADDRBITS=16;
   parameter IMEMWORDBITS=2;
   parameter IMEMWORDS=(1<<(IMEMADDRBITS-IMEMWORDBITS));
@@ -127,24 +127,65 @@ module Project(
   assign thebus=DrPC?PC:BUSZ;
 
   /*************** Fetch - Instruction memory *****************/  
-  //(* ram_init_file = IMEMINITFILE *)
+  (* ram_init_file = IMEMINITFILE *)
   reg [(DBITS-1):0] imem[(IMEMWORDS-1):0];
-  always @(posedge reset) begin
-  imem[0] <= 32'h801D6B98	;   //addi	s2,Zero,7531
-  imem[1] <= 32'h80E29588	;		 //add  s1,s1,s2
-  imem[2] <= 32'h20000589	;   //beq  s1, s2, skip 2
-  imem[3] <= 32'h00980000	;	  //	xor		fp,fp,fp
-  imem[4] <= 32'h68F00009	; 	 //add   Zero,fp,fp
-  imem[5] <= 32'h00B00500	;   //sw    s1, 5(Zero)
-  imem[6] <= 32'h68F02005	;   //lw    t0, 5(Zer0)
-  imem[7] <= 32'h20FFFB00	;   //addi	s2,Zero,7531
-  imem[8] <= 32'h00980DDD		;		 //add  s1,s1,s2
-  imem[9] <= 32'h008000DD		;   //beq  s1, s2, skip 2
-  imem[10] <= 32'h80000107		;	  //	xor		fp,fp,fp
-  imem[11] <= 32'h68F020D7		; 	 //add   Zero,fp,fp
-  imem[12] <= 32'h80000177		;   //sw    s1, 5(Zero)
-  imem[13] <= 32'h68F020D7		;   //lw    t0, 5(Zer0)
-  end
+  /*always @(posedge reset) begin
+  imem[0] <= 32'h80000177		;   
+  imem[1] <= 32'h68F020E7		;		 
+  imem[2] <= 32'h800330D6		;   
+  imem[3] <= 32'h3000CDD5		;	  
+  imem[4] <= 32'h20000400		; 	 
+  imem[5] <= 32'h2C000156		;   
+  imem[6] <= 32'h30000056		;   
+  imem[7] <= 32'h68F00005	;   
+  imem[8] <= 32'h20FFFE55			;		 
+  imem[9] <= 32'h80000177			;   
+  imem[10] <= 32'h68F020E7			;	  
+  imem[11] <= 32'h48F080D6			; 	 
+  imem[12] <= 32'h68F000D6			;   
+  imem[13] <= 32'h20FFFD60			;   
+  imem[14] <= 32'h48F080D6	  ;   
+  imem[15] <= 32'h68F000D6			;		 
+  imem[16] <= 32'h2CFFFD6D			;   
+  imem[17] <= 32'h00B005DD				;	  
+  imem[18] <= 32'h68F020D5				; 	 
+  imem[19] <= 32'h68F00005				;   
+  imem[20] <= 32'h20FFFC55				;   
+  
+  MemWorks:
+	; Put 23 on LEDR
+	addi	s0,s0,1
+	sw		s0,LEDR(sp)
+	addi	fp,t1,JalRet
+	jal		t0,JalTarg(fp)
+JalRet:
+	br		JalWorks
+JalTarg:
+	bne		t0,t1,JalFailed
+	jal		t1,0(t0) 
+JalFailed:
+	; Display what's in t0
+	sw		t0,HEX(Zero)
+	beq		t0,t0,JalFailed
+JalWorks:
+	; Put 24 on LEDR
+	addi	s0,s0,1
+	sw		s0,LEDR(sp)
+WaitPress1:
+	lw		t1,KEY(fp)
+	sw		t1,HEX(fp)
+	beq		t1,Zero,WaitPress1
+WaitRelease1:
+	lw		t1,KEY(fp)
+	sw		t1,HEX(fp)
+	bne		t1,fp,WaitRelease1
+Done:
+	; Turn on LEDR, put FFFFFF on HEX
+	not		t0,fp
+	sw		t0,LEDR(fp)
+	sw		t0,HEX(Zero)
+	beq		t0,t0,Done
+  end*/
   wire [(DBITS-1):0] iMemOut;
   
   assign iMemOut=imem[PC[(IMEMADDRBITS-1):IMEMWORDBITS]];
@@ -317,6 +358,7 @@ module Project(
   // TODO: Put the code for data memory and I/O here  
   //Data memory
   reg [(DBITS-1):0] MAR;
+  (* ram_init_file = IMEMINITFILE *)
   reg [(DBITS-1):0] dmem[(DMEMWORDS-1):0];
   
   //Data signals
@@ -359,8 +401,8 @@ module Project(
   reg DrKey, DrSwitch;
   wire [31:0] key_value;
   wire [31:0] switch_value;
-  assign key_value = ~KEY;
-  assign switch_value[9:0] = SW;
+  assign key_value = ~KEY & 32'h0000000f;
+  assign switch_value = SW & 32'h000003ff;
   
   assign thebus=DrKey? key_value:BUSZ;
   assign thbus=DrSwitch? switch_value :BUSZ;  
@@ -373,8 +415,8 @@ module Project(
   reg WrLedr, WrHex;
   always @(posedge clk or posedge reset) begin
 	 if (reset) begin
-		ledr_reg <= 10'h2ff;
-		hex_reg <= 24'hffffff;
+		ledr_reg <= 10'h0;
+		hex_reg <= 24'h0;
 	 end
     else if (WrLedr) begin
       ledr_reg <= ledr_in;
@@ -412,7 +454,8 @@ module Project(
 	 S_JAL2			= S_JAL1	 + S_ONE,
 	 S_JAL3			= S_JAL2	 + S_ONE,
 	 S_JAL4			= S_JAL3	 + S_ONE,
-	 S_LW1			= S_JAL4	 + S_ONE,
+	 S_JAL5 			= S_JAL4  + S_ONE,
+	 S_LW1			= S_JAL5	 + S_ONE,
 	 S_LW2			= S_LW1	 + S_ONE,
 	 S_LW3			= S_LW2	 + S_ONE,
 	 S_LW4			= S_LW3	 + S_ONE,
@@ -425,7 +468,7 @@ module Project(
  reg [(S_BITS-1):0] state,next_state;
   always @(state or op1 or rs or rt or rd or op2 or ALUout[0]) begin
     {LdPC,DrPC,IncPC,LdMAR,WrMem,DrMem,LdIR,DrOff,ShOff, LdA, LdB,ALUfunc,DrALU,regno   ,DrReg,WrReg,next_state,DrKey,DrSwitch,WrLedr,WrHex}=
-    {1'b0,1'b0, 1'b0, 1'b0, 1'b0, 1'b0,1'b0, 1'b0, 1'b0,1'b0,1'b0,   6'bX,1'b0,6'b000000, 1'b0, 1'b0,state+S_ONE,1'b0,    1'b0,  1'b0, 1'b0};
+    {1'b0,1'b0, 1'b0, 1'b0, 1'b0, 1'b0,1'b0, 1'b0, 1'b0,1'b0,1'b0,   6'bX,1'b0,4'b0000, 1'b0, 1'b0,state+S_ONE,1'b0,    1'b0,  1'b0, 1'b0};
     case(state)
       S_FETCH1: {LdIR,IncPC}={1'b1,1'b1};
       S_FETCH2: begin
@@ -570,8 +613,11 @@ module Project(
 		S_JAL4: begin
 						ALUfunc = ALUFUNC_ADD;
 						{DrALU, LdPC} = {1'b1, 1'b1};
-						next_state = S_FETCH1;
+						next_state = S_JAL5;
 				  end
+		S_JAL5: begin
+						next_state = S_FETCH1;
+				 end
 		S_LW1: begin
 						regno = rs;
 						{DrReg, LdA} = {1'b1, 1'b1};
@@ -674,4 +720,5 @@ module SXT(IN,OUT);
   output [(OBITS-1):0] OUT;
   assign OUT={{(OBITS-IBITS){IN[IBITS-1]}},IN};
 endmodule
+
 
